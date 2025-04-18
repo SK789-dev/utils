@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createClient } from "@/api/clients";
 import { CreateClientRequest } from "@/api/clients/ClientRequests";
 import { getLinesOfBusiness } from "@/api/lineOfBusiness";
@@ -9,23 +9,24 @@ import { Button, Grid, MenuItem, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { FieldArray, Formik } from "formik";
-import { useEffect, useState } from "react";
 import { ApiError } from "../../types/api";
 
 const CREATE_CLIENT_FORM = "create-client-form";
 
-interface CreateClientModalProps {
+interface ManageClientModalProps {
     onClose: () => void;
     onClientCreated: (clientName: string) => void;
+    title?: string;
+    submitButtonLabel?: string;
 }
 
-export default function CreateClientModal({
+export default function ManageClientModal({
     onClose,
     onClientCreated,
-}: CreateClientModalProps) {
-    const [createClientErrors, setCreateClientErrors] = useState<
-        string[] | undefined
-    >(undefined);
+    title = "Create Client",
+    submitButtonLabel = "Create Client",
+}: ManageClientModalProps) {
+    const [createClientErrors, setCreateClientErrors] = useState<string[] | undefined>(undefined);
 
     const { data: linesOfBusiness } = useQuery({
         queryKey: ["lobs"],
@@ -36,18 +37,16 @@ export default function CreateClientModal({
 
     return (
         <GenericDialog
-            title="Create Client"
+            title={title}
             formId={CREATE_CLIENT_FORM}
             handleClose={onClose}
             closeButtonLabel="Cancel"
-            submitButtonLabel="Create Client"
+            submitButtonLabel={submitButtonLabel}
         >
             <Grid container direction="column">
                 <Grid item>
                     <Formik
-                        initialValues={
-                            { name: "", code: "", linesOfBusiness: [] } as CreateClientRequest
-                        }
+                        initialValues={{ name: "", code: "", linesOfBusiness: [] } as CreateClientRequest}
                         onSubmit={(values) => {
                             setCreateClientErrors(undefined);
                             createClient({
@@ -64,72 +63,62 @@ export default function CreateClientModal({
                     >
                         {({ values, handleChange, handleSubmit }) => (
                             <form id={CREATE_CLIENT_FORM} onSubmit={handleSubmit}>
-                                <Grid container spacing={2}>
+                                <Grid container>
                                     {createClientErrors && (
-                                        <Grid item xs={12}>
-                                            <div className="flex flex-col items-start text-red-500 w-full pl-6">
-                                                <Typography variant="h6">
-                                                    Client NOT CREATED as {createClientErrors.length} error
-                                                    {createClientErrors.length > 1 && "s"}{" "}
-                                                    {createClientErrors.length > 1 ? "were" : "was"}{" "}
-                                                    encountered...
-                                                </Typography>
-                                                <ul className="text-black text-sm pl-6">
-                                                    {createClientErrors.map((error, index) => (
-                                                        <li className="list-disc" key={`error-${index}`}>
-                                                            <strong>{error}</strong>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        </Grid>
+                                        <div className="flex flex-col items-start text-red-500 w-full pl-6">
+                                            <Typography variant="h6">
+                                                Client NOT CREATED as {createClientErrors.length} error
+                                                {createClientErrors.length > 1 && "s"} {createClientErrors.length > 1 ? "were" : "was"} encountered...
+                                            </Typography>
+                                            <ul className="text-black text-sm pl-6">
+                                                {createClientErrors.map((error, index) => (
+                                                    <li className="list-disc" key={`error-${index}`}>
+                                                        <strong>{error}</strong>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     )}
-
                                     <Grid item xs={6}>
                                         <FormikTextField label="Client Name" name="name" />
                                     </Grid>
-                                    <Grid item xs={6}>
+                                    <Grid item>
                                         <FormikTextField label="Client Code" name="code" />
                                     </Grid>
-
                                     <FieldArray name="linesOfBusiness">
                                         {({ push, remove }) => (
                                             <>
                                                 {values.linesOfBusiness.map((_, index) => (
-                                                    <Grid
-                                                        container
-                                                        item
-                                                        spacing={2}
-                                                        key={`line-of-business_${index}`}
-                                                    >
-                                                        <Grid item xs={4}>
+                                                    <Grid container item key={`line-of-business_${index}`}>
+                                                        <Grid item>
                                                             <FormikTextField
-                                                                style={{ width: "100%" }}
+                                                                style={{ width: 200 }}
                                                                 onChange={handleChange}
                                                                 select
                                                                 label="Line of Business"
                                                                 name={`linesOfBusiness[${index}].lineOfBusiness`}
+                                                                defaultValue={"COMMERCIAL"}
                                                                 required
                                                             >
                                                                 {linesOfBusiness?.length === 0 ? (
                                                                     <MenuItem disabled>Loading...</MenuItem>
                                                                 ) : (
                                                                     linesOfBusiness?.map((lob) => (
-                                                                        <MenuItem key={lob} value={lob}>
+                                                                        <MenuItem key={lob} value={lob} id={lob}>
                                                                             {lob}
                                                                         </MenuItem>
                                                                     ))
                                                                 )}
                                                             </FormikTextField>
                                                         </Grid>
-                                                        <Grid item xs={4}>
+                                                        <Grid item>
                                                             <FormikTextField
                                                                 label="Carrier Id"
                                                                 name={`linesOfBusiness[${index}].carrierId`}
                                                                 required
                                                             />
                                                         </Grid>
-                                                        <Grid item xs={4} display="flex" alignItems="center">
+                                                        <Grid item display="flex" alignItems="center" justifyContent="center">
                                                             <Button onClick={() => remove(index)}>
                                                                 <DeleteIcon sx={{ fontSize: 18 }} />
                                                             </Button>
@@ -139,10 +128,7 @@ export default function CreateClientModal({
                                                 <Grid item xs={12}>
                                                     <Button
                                                         onClick={() => {
-                                                            push({
-                                                                lineOfBusiness: "",
-                                                                carrierId: "",
-                                                            });
+                                                            push({ lineOfBusiness: "", carrierId: "" });
                                                         }}
                                                     >
                                                         Add LOB & Carrier ID
