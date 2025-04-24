@@ -1,0 +1,79 @@
+[
+    {
+        "id": "TOjUYfFEIRF9HS2D",
+        "name": "BCBSKS - Group Eligibility",
+        "clientId": "AxwUUCPdSFCGe67k",
+        "fileType": "FIXED_WIDTH_TOKENIZED",
+        "lineOfBusiness": "COMMERCIAL",
+        "fileNameTokens": [],
+        "fieldDefinitions": [
+            {
+                "id": "2o63uw4YmRUVxeLf",
+                "name": "BCBSKS - Group Eligibility - Plan Account Id",
+                "fieldType": "PLAIN_TEXT",
+                "key": "planAccountId",
+                "path": null,
+                "startPosition": 10,
+                "endPosition": 24,
+                "compositeKeyOrder": 2,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            },
+            {
+                "id": "Qyy0zGeuKWJQ27uJ",
+                "name": "BCBSKS - Group Eligibility - Client Id",
+                "fieldType": "PLAIN_TEXT",
+                "key": "carrierId",
+                "path": null,
+                "startPosition": 1,
+                "endPosition": 9,
+                "compositeKeyOrder": 1,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            },
+            {
+                "id": "M95f3YwT1CWgI091",
+                "name": "BCBSKS - Group Eligibility - Group Id",
+                "fieldType": "PLAIN_TEXT",
+                "key": "groupId",
+                "path": null,
+                "startPosition": 25,
+                "endPosition": 39,
+                "compositeKeyOrder": 3,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            },
+            {
+                "id": "XIokjIIE5Ga28aEd",
+                "name": "BCBSKS - Group Eligibility - Group Name",
+                "fieldType": "PLAIN_TEXT",
+                "key": "groupName",
+                "path": null,
+                "startPosition": 40,
+                "endPosition": 64,
+                "compositeKeyOrder": null,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            },
+            {
+                "id": "fowyBDuVvLrEeb5F",
+                "name": "BCBSKS - Group Eligibility - Termination Date",
+                "fieldType": "LEGACY_DATE",
+                "key": "terminationDate",
+                "path": null,
+                "startPosition": 204,
+                "endPosition": 210,
+                "compositeKeyOrder": 5,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            },
+            {
+                "id": "CDvs3zt8FaC9A4L9",
+                "name": "BCBSKS - Group Eligibility - Effective Date",
+                "fieldType": "LEGACY_DATE",
+                "key": "effectiveDate",
+                "path": null,
+                "startPosition": 197,
+                "endPosition": 203,
+                "compositeKeyOrder": 4,
+                "clientFileDefinitionId": "TOjUYfFEIRF9HS2D"
+            }
+        ],
+        "baseRecordFieldPaths": []
+    }
+]

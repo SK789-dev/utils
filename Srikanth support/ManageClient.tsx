@@ -15,9 +15,10 @@ const CREATE_CLIENT_FORM = "create-client-form";
 
 interface ManageClientModalProps {
     onClose: () => void;
-    onClientCreated: (clientName: string) => void;
+    onClientCreated: (clientData: any) => void;
     title?: string;
     submitButtonLabel?: string;
+    initialValues?: any;
 }
 
 export default function ManageClientModal({
@@ -25,6 +26,7 @@ export default function ManageClientModal({
     onClientCreated,
     title = "Create Client",
     submitButtonLabel = "Create Client",
+    initialValues,
 }: ManageClientModalProps) {
     const [createClientErrors, setCreateClientErrors] = useState<string[] | undefined>(undefined);
 
@@ -32,6 +34,12 @@ export default function ManageClientModal({
         queryKey: ["lobs"],
         queryFn: async () => getLinesOfBusiness(),
     });
+
+    const defaultValues = {
+        name: "",
+        code: "",
+        linesOfBusiness: []
+    };
 
     useEffect(() => { }, [linesOfBusiness]);
 
@@ -46,19 +54,27 @@ export default function ManageClientModal({
             <Grid container direction="column">
                 <Grid item>
                     <Formik
-                        initialValues={{ name: "", code: "", linesOfBusiness: [] } as CreateClientRequest}
+                        initialValues={initialValues || defaultValues}
                         onSubmit={(values) => {
                             setCreateClientErrors(undefined);
-                            createClient({
-                                name: values.name,
-                                code: values.code,
-                                linesOfBusiness: values.linesOfBusiness,
-                            })
-                                .then((data) => onClientCreated(data.name))
-                                .catch((err: AxiosError) => {
-                                    const errorDetails = err.response?.data as ApiError;
-                                    setCreateClientErrors(errorDetails.message.split("|"));
-                                });
+                            // For creating new clients
+                            if (!initialValues) {
+                                createClient({
+                                    name: values.name,
+                                    code: values.code,
+                                    linesOfBusiness: values.linesOfBusiness,
+                                })
+                                    .then((data) => {
+                                        onClientCreated(data.name);
+                                    })
+                                    .catch((err: AxiosError) => {
+                                        const errorDetails = err.response?.data as ApiError;
+                                        setCreateClientErrors(errorDetails.message.split("|"));
+                                    });
+                            } else {
+                                // For updating existing clients
+                                onClientCreated(values);
+                            }
                         }}
                     >
                         {({ values, handleChange, handleSubmit }) => (
@@ -67,7 +83,7 @@ export default function ManageClientModal({
                                     {createClientErrors && (
                                         <div className="flex flex-col items-start text-red-500 w-full pl-6">
                                             <Typography variant="h6">
-                                                Client NOT CREATED as {createClientErrors.length} error
+                                                Client NOT {initialValues ? "UPDATED" : "CREATED"} as {createClientErrors.length} error
                                                 {createClientErrors.length > 1 && "s"} {createClientErrors.length > 1 ? "were" : "was"} encountered...
                                             </Typography>
                                             <ul className="text-black text-sm pl-6">
