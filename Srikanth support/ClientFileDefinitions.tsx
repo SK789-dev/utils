@@ -16,7 +16,6 @@ import {
     getClientFileDefinitions,
     postClientFileDefinitions,
 } from "@/api/clients/clientFileDefinitions";
-
 function ClientFileDefinitions() {
     const { clientId } = useParams();
     const [clientName, setClientName] = useState("");
@@ -92,8 +91,8 @@ function ClientFileDefinitions() {
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ mb: 3 }}>
                 {/* <Typography variant="h5">
-          {clientName || "Client"} - File Definitions
-        </Typography> */}
+{clientName || "Client"} - File Definitions
+</Typography> */}
                 <Box
                     sx={{
                         display: "flex",
@@ -127,8 +126,7 @@ function ClientFileDefinitions() {
                                         setNewDefinition({ ...newDefinition, name: e.target.value })
                                     }
                                 />
-                            </Grid>
-                            <Grid item xs={4}>
+                            </Grid><Grid item xs={4}>
                                 <TextField
                                     fullWidth
                                     label="Line of Business"
@@ -140,8 +138,7 @@ function ClientFileDefinitions() {
                                         })
                                     }
                                 />
-                            </Grid>
-                            <Grid item xs={4}>
+                            </Grid><Grid item xs={4}>
                                 <TextField
                                     fullWidth
                                     label="File Type"
@@ -153,8 +150,7 @@ function ClientFileDefinitions() {
                                         })
                                     }
                                 />
-                            </Grid>
-                        </Grid>
+                            </Grid></Grid>
                         <Button
                             sx={{ mt: 3, mb: 2 }}
                             variant="outlined"
@@ -168,8 +164,7 @@ function ClientFileDefinitions() {
                                 }));
                             }}
                         >
-                            + Add File Name Token
-                        </Button>
+                            Add File Name Token </Button>
                         {newDefinition.fileNameTokens?.map((field, index) => (
                             <Grid container spacing={2} key={`token-${index}`} sx={{ mb: 2 }}>
                                 <Grid item xs={2}>
@@ -246,184 +241,189 @@ function ClientFileDefinitions() {
                             + Add Field Definition
                         </Button>
                         {newDefinition.fieldDefinitions?.map((field, index) => (
-              <Grid container spacing={2} key={`field-${index}`} sx={{ mb: 2 }}>
-                <Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="Field Name"
-                    value={field.name}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].name = e.target.value;
-                      setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
- <Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="Key"
-                    value={field.key}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].key = e.target.value;
-                      setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="Field Type"
-                    value={field.fieldType}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].fieldType = e.target.value;
-setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="Start Position"
-                    type="number"
-                    value={field.startPosition}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].startPosition = parseInt(
-                        e.target.value || "0"
-                      );
-                      setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-<Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="End Position"
-                    type="number"
-                    value={field.endPosition}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].endPosition = parseInt(
-                        e.target.value || "0"
-                      );
-                      setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].path = e.target.value;
-                      setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={2}>
-                  <TextField
-                    fullWidth
-                    label="Composite Key Order"
-                    type="number"
-                    value={field.compositeKeyOrder}
-                    onChange={(e) => {
-                      const updated = [...newDefinition.fieldDefinitions];
-                      updated[index].compositeKeyOrder = parseInt(
-                        e.target.value || "0"
-                      );
-setNewDefinition({
-                        ...newDefinition,
-                        fieldDefinitions: updated,
-                      });
-                    }}
-                  />
-                </Grid>
-              </Grid>
-                ))}
-                <Button
-                    variant="contained"
-                    onClick={() => {
-                        const payload = {
-                            name: newDefinition.name,
-                            lineOfBusiness: newDefinition.lineOfBusiness,
-                            fileType: newDefinition.fileType,
-                            ...(newDefinition.fileNameTokens.length > 0 && {
-                                fileNameTokens: newDefinition.fileNameTokens,
-                            }),
-                            ...(newDefinition.fieldDefinitions.length > 0 && {
-                                fieldDefinitions: newDefinition.fieldDefinitions,
-                            }),
-                        };
-                        mutation.mutate(payload);
-                    }}
-                >
-                    Save
-                </Button>
-            </Box>
-        )}
-            <Box>
-                {fileDefinitions.length > 0 ? (
-                    fileDefinitions.map((definition, index) => (
-                        <Paper
-                            key={definition.id || index}
-                            elevation={0}
-                            sx={{
-                                p: 2,
-                                backgroundColor: index % 2 === 0 ? "white.100" : "grey",
-                                borderRadius: 0,
-                            }}
-                        >
-                            <Grid container spacing={2}>
-                                <Grid item xs={11}>
-                                    <Typography variant="h6">
-                                        {definition.name || "Name"}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        LOB: {definition.lineOfBusiness || "Line of Business"}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        File type: {definition.fileType || "File Type"}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        {definition.fieldDefinitions?.length || 0} Field
-                                        Definition(s)
-                                    </Typography>
-                                    <Typography variant="body2">
-                                        {definition.fileNameTokens?.length || 0} File Name
-                                        Token(s)
-                                    </Typography>
+                            <Grid container spacing={2} key={`field-${index}`} sx={{ mb: 2 }}>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Field Name"
+                                        value={field.name}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].name = e.target.value;
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Key"
+                                        value={field.key}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].key = e.target.value;
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Field Type"
+                                        value={field.fieldType}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].fieldType = e.target.value;
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Start Position"
+                                        type="number"
+                                        value={field.startPosition}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].startPosition = parseInt(
+                                                e.target.value || "0"
+                                            );
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="End Position"
+                                        type="number"
+                                        value={field.endPosition}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].endPosition = parseInt(
+                                                e.target.value || "0"
+                                            );
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Path"
+                                        value={field.path}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].path = e.target.value;
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={2}>
+                                    <TextField
+                                        fullWidth
+                                        label="Composite Key Order"
+                                        type="number"
+                                        value={field.compositeKeyOrder}
+                                        onChange={(e) => {
+                                            const updated = [...newDefinition.fieldDefinitions];
+                                            updated[index].compositeKeyOrder = parseInt(
+                                                e.target.value || "0"
+                                            );
+                                            setNewDefinition({
+                                                ...newDefinition,
+                                                fieldDefinitions: updated,
+                                            });
+                                        }}
+                                    />
                                 </Grid>
                             </Grid>
-                        </Paper>
-                    ))
-                ) : (
-                    <Box sx={{ p: 4, textAlign: "center" }}>
-                        <Typography variant="body1">
-                            No file definitions found for this client.
-                        </Typography>
+                        ))}
+                        <Button
+                            variant="contained"
+                            onClick={() => {
+                                const payload = {
+                                    name: newDefinition.name,
+                                    lineOfBusiness: newDefinition.lineOfBusiness,
+                                    fileType: newDefinition.fileType,
+                                    ...(newDefinition.fileNameTokens.length > 0 && {
+                                        fileNameTokens: newDefinition.fileNameTokens,
+                                    }),
+                                    ...(newDefinition.fieldDefinitions.length > 0 && {
+                                        fieldDefinitions: newDefinition.fieldDefinitions,
+                                    }),
+                                };
+                                mutation.mutate(payload);
+                            }}
+                        >
+                            Save
+                        </Button>
                     </Box>
                 )}
+                <Box>
+                    {fileDefinitions.length > 0 ? (
+                        fileDefinitions.map((definition, index) => (
+                            <Paper
+                                key={definition.id || index}
+                                elevation={0}
+                                sx={{
+                                    p: 2,
+                                    backgroundColor: index % 2 === 0 ? "white.100" : "grey",
+                                    borderRadius: 0,
+                                }}
+                            >
+                                <Grid container spacing={2}>
+                                    <Grid item xs={11}>
+                                        <Typography variant="h6">
+                                            {definition.name || "Name"}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            LOB: {definition.lineOfBusiness || "Line of Business"}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            File type: {definition.fileType || "File Type"}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {definition.fieldDefinitions?.length || 0} Field
+                                            Definition(s)
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            {definition.fileNameTokens?.length || 0} File Name
+                                            Token(s)
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        ))
+                    ) : (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                            <Typography variant="body1">
+                                No file definitions found for this client.
+                            </Typography>
+                        </Box>
+                    )}
+                </Box>
             </Box>
-        </Box>
-    </Container >
-  );
+        </Container>
+    );
 }
 export default ClientFileDefinitions;
