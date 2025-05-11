@@ -1,4 +1,6 @@
 import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Box,
@@ -20,20 +22,21 @@ import { useState, useEffect } from "react";
 import {
     getClientFileDefinitions,
     postClientFileDefinitions,
+    updateClientFileDefinitions,
     getFileTypes,
     getTokenTypes,
     getFieldTypes,
+    postRecordMatchCriteria,
+    getRecordMatchCriteria,
 } from "@/api/clients/clientFileDefinitions";
 import { getLinesOfBusiness } from "@/api/lineOfBusiness";
 import { ClientFileDefinitions as ClientFileDefinitionsType } from "@/types/api";
 import ClientFileFieldDefinitions from "@/components/ClientFieldDefinitions";
-
 interface FileNameToken {
     type: string;
     token: string;
     tokenOrder: number;
 }
-
 interface FieldDefinition {
     name: string;
     key: string;
@@ -43,12 +46,10 @@ interface FieldDefinition {
     compositeKeyOrder: number;
     path: string;
 }
-
 interface DropdownOption {
     value: string;
     label: string;
 }
-
 interface NewDefinition {
     name: string;
     lineOfBusiness: string;
@@ -56,18 +57,24 @@ interface NewDefinition {
     fileNameTokens: FileNameToken[];
     fieldDefinitions: FieldDefinition[];
 }
-
 function ClientFileDefinitions() {
+    const [editingDefinitionId, setEditingDefinitionId] = useState<
+        string | number | null
+    >(null);
+    const [editingDefinition, setEditingDefinition] =
+        useState<Partial<ClientFileDefinitionsType> | null>(null);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null); // track index if fallback to local update
     const { clientId } = useParams<{ clientId: string }>();
-    const [clientName, setClientName] = useState<string>("");
+    const location = useLocation();
+    const { clientName, clientCode } = location.state || {};
     const [fileDefinitions, setFileDefinitions] = useState<
         ClientFileDefinitionsType[]
     >([]);
     const queryClient = useQueryClient();
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
-    const [expandedDefinitionId, setExpandedDefinitionId] = useState<string | number | null>(null);
-
-    // State for dropdown options
+    const [expandedDefinitionId, setExpandedDefinitionId] = useState<
+        string | number | null
+    >(null);
     const [lineOfBusinessOptions, setLineOfBusinessOptions] = useState<
         DropdownOption[]
     >([]);
@@ -78,57 +85,136 @@ function ClientFileDefinitions() {
     const [fieldTypeOptions, setFieldTypeOptions] = useState<DropdownOption[]>(
         []
     );
-
     const { data, isLoading, isError } = useQuery({
         queryKey: ["clientFileDefinitions", clientId],
         queryFn: () =>
             clientId ? getClientFileDefinitions(clientId) : Promise.resolve([]),
         enabled: !!clientId,
     });
-
-    // Fetch dropdown options from API
-    const { data: lobData } = useQuery({
-        queryKey: ["lineOfBusiness"],
-        queryFn: getLinesOfBusiness,
-    });
-
-    const { data: fileTypeData } = useQuery({
-        queryKey: ["fileTypes"],
-        queryFn: getFileTypes,
-    });
-
-    const { data: tokenTypeData } = useQuery({
-        queryKey: ["tokenTypes"],
-        queryFn: getTokenTypes,
-    });
-
-    const { data: fieldTypeData } = useQuery({
-        queryKey: ["fieldTypes"],
-        queryFn: getFieldTypes,
-    });
-
-    useEffect(() => {
-        if (lobData) {
-            setLineOfBusinessOptions(lobData);
-        }
-        if (fileTypeData) {
-            setFileTypeOptions(fileTypeData);
-        }
-        if (tokenTypeData) {
-            setTokenTypeOptions(tokenTypeData);
-        }
-        if (fieldTypeData) {
-            setFieldTypeOptions(fieldTypeData);
-        }
-    }, [lobData, fileTypeData, tokenTypeData, fieldTypeData]);
-
     useEffect(() => {
         if (data) {
-            setClientName(data.name ?? "");
             setFileDefinitions(Array.isArray(data) ? data : []);
         }
     }, [data]);
-
+    useEffect(() => {
+        async function fetchLines() {
+            const lines: string[] = await getLinesOfBusiness();
+            setLineOfBusinessOptions(
+                lines.map((line) => ({
+                    value: line,
+                    label: line,
+                }))
+            );
+        }
+        fetchLines();
+    }, []);
+    useEffect(() => {
+        async function fetchLines() {
+            const lines: string[] = await getFileTypes();
+            setFileTypeOptions(
+                lines.map((line) => ({
+                    value: line,
+                    label: line,
+                }))
+            );
+        }
+        fetchLines();
+    }, []);
+    useEffect(() => {
+        async function fetchLines() {
+            const lines: string[] = await getTokenTypes();
+            setTokenTypeOptions(
+                lines.map((line) => ({
+                    value: line,
+                    label: line,
+                }))
+            );
+        }
+        fetchLines();
+    }, []);
+    useEffect(() => {
+        async function fetchLines() {
+            const lines: string[] = await getFieldTypes();
+            setFieldTypeOptions(
+                lines.map((line) => ({
+                    value: line,
+                    label: line,
+                }))
+            );
+        }
+        fetchLines();
+    }, []);
+    useEffect(() => {
+        if (data) {
+            const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name)); // or original index tracking
+            setFileDefinitions(sorted);
+        }
+    }, [data]);
+    const handleEditClick = (
+        definition: ClientFileDefinitionsType,
+        index: number
+    ) => {
+        setEditingDefinitionId(definition.id || index);
+        setEditingDefinition({ ...definition });
+        setEditingIndex(index);
+    };
+    const handleCancelEdit = () => {
+        setEditingDefinitionId(null);
+        setEditingDefinition(null);
+        setEditingIndex(null);
+    };
+    const updateMutation = useMutation({
+        mutationFn: () =>
+            editingDefinition?.id
+                ? updateClientFileDefinitions(
+                    editingDefinition.id.toString(),
+                    editingDefinition
+                )
+                : Promise.resolve({}),
+        onSuccess: (data) => {
+            const updatedItem = {
+                ...editingDefinition,
+                ...data,
+                id: editingDefinition?.id,
+            };
+            if (editingIndex !== null) {
+                setFileDefinitions((prev) => {
+                    const updated = [...prev];
+                    updated[editingIndex] = JSON.parse(JSON.stringify(updatedItem));
+                    return updated;
+                });
+            }
+            setEditingDefinitionId(null);
+            setEditingDefinition(null);
+            setEditingIndex(null);
+        },
+        onError: (err) => {
+            console.error("Update failed:", err);
+            alert("Failed to update. Please try again.");
+        },
+    });
+    const handleSaveEdit = () => {
+        if (editingDefinition) {
+            updateMutation.mutate();
+        }
+    };
+    const [recordMatch, setRecordMatch] = useState({
+        name: "",
+        baseRecordFieldPath: "",
+        rulesetId: "",
+    });
+    const handleSaveRecordMatchCriteria = async (
+        clientFileDefinitionId: string
+    ) => {
+        try {
+            postRecordMatchCriteria(clientFileDefinitionId, recordMatch);
+            alert("Record Match Criteria created successfully.");
+            setRecordMatch({ name: "", baseRecordFieldPath: "", rulesetId: "" });
+        } catch (err) {
+            alert("Failed to create Record Match Criteria.");
+            console.error(err);
+        }
+    };
     const [newDefinition, setNewDefinition] = useState<NewDefinition>({
         name: "",
         lineOfBusiness: "",
@@ -136,7 +222,6 @@ function ClientFileDefinitions() {
         fileNameTokens: [],
         fieldDefinitions: [],
     });
-
     const mutation = useMutation({
         mutationFn: () => {
             const payload = {
@@ -159,7 +244,9 @@ function ClientFileDefinitions() {
         },
         onSuccess: () => {
             if (clientId) {
-                queryClient.invalidateQueries(["clientFileDefinitions", clientId]);
+                queryClient.invalidateQueries({
+                    queryKey: ["clientFileDefinitions", clientId],
+                });
             }
             setNewDefinition({
                 name: "",
@@ -171,8 +258,6 @@ function ClientFileDefinitions() {
             setShowAddForm(false);
         },
     });
-
-    // Add a new token with automatic order number
     const handleAddFileNameToken = () => {
         const nextOrder = newDefinition.fileNameTokens.length;
         setNewDefinition((prev) => ({
@@ -183,8 +268,6 @@ function ClientFileDefinitions() {
             ],
         }));
     };
-
-    // Add a new field definition with automatic composite key order
     const handleAddFieldDefinition = () => {
         const nextOrder = newDefinition.fieldDefinitions.length;
         setNewDefinition((prev) => ({
@@ -203,13 +286,11 @@ function ClientFileDefinitions() {
             ],
         }));
     };
-
-    const handleToggleFieldDefinitions = (definitionId) => {
+    const handleToggleFieldDefinitions = (definitionId: string | number) => {
         setExpandedDefinitionId(
             expandedDefinitionId === definitionId ? null : definitionId
         );
     };
-
     const handleSave = () => {
         if (
             newDefinition.name.trim() === "" ||
@@ -230,21 +311,49 @@ function ClientFileDefinitions() {
         }
         mutation.mutate();
     };
-
-    const handleLineOfBusinessChange = (event: SelectChangeEvent) => {
-        setNewDefinition({
-            ...newDefinition,
-            lineOfBusiness: event.target.value,
-        });
+    const handleLineOfBusinessChange = (selectedValue: string) => {
+        setNewDefinition((prev) => ({
+            ...prev,
+            lineOfBusiness: selectedValue,
+        }));
     };
-
-    const handleFileTypeChange = (event: SelectChangeEvent) => {
-        setNewDefinition({
-            ...newDefinition,
-            fileType: event.target.value,
-        });
+    const handleFileTypeChange = (selectedValue: string) => {
+        setNewDefinition((prev) => ({
+            ...prev,
+            fileType: selectedValue,
+        }));
     };
+    const { data: allRMCs } = useQuery({
+        queryKey: ["recordMatchCriteria", clientId],
+        queryFn: () => getAllRecordMatchCriteria(clientId),
+    });
+    const rmcGroupedByDefinitionId = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        allRMCs?.forEach((rmc) => {
+            if (!map[rmc.clientFileDefinitionId]) {
+                map[rmc.clientFileDefinitionId] = [];
+            }
+            map[rmc.clientFileDefinitionId].push(rmc);
+        });
+        return map;
+    }, [allRMCs]);
+    const [rmcMap, setRmcMap] = useState<Record<string, any[]>>({});
+    const [loadingRmcId, setLoadingRmcId] = useState<string | null>(null);
 
+    const handleViewRMC = async (definitionId: string) => {
+        setLoadingRmcId(definitionId);
+        try {
+            const data = await getRecordMatchCriteria(clientId);
+            setRmcMap((prev) => ({
+                ...prev,
+                [definitionId]: data,
+            }));
+        } catch (err) {
+            console.error("Failed to load RMC for definition:", definitionId, err);
+        } finally {
+            setLoadingRmcId(null);
+        }
+    };
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ mb: 3 }}>
@@ -256,8 +365,15 @@ function ClientFileDefinitions() {
                         mb: 3,
                     }}
                 >
-                    <Typography variant="h5">
-                        {clientName || "Client"} - File Definitions
+                    <Typography variant="h5" component="h1">
+                        <Link
+                            to={`/clients/${clientId}`}
+                            style={{ textDecoration: "none", color: "inherit" }}
+                        >
+                            {clientName || "Client"}
+                            {clientCode ? ` (${clientCode})` : ""}
+                        </Link>{" "}
+                        – File Definitions
                     </Typography>
                     <Button
                         variant="outlined"
@@ -266,19 +382,18 @@ function ClientFileDefinitions() {
                         {showAddForm ? "Close" : "+ Add File Definition"}
                     </Button>
                 </Box>
-
                 {isLoading && (
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
                         <CircularProgress />
                     </Box>
                 )}
-
                 {isError && (
                     <Alert severity="error" sx={{ mt: 2 }}>
                         Failed to load file definitions. Please try again.
                     </Alert>
                 )}
 
+                S P  to  Everyone 10:24 PM
                 {showAddForm && (
                     <Box sx={{ mt: 3, mb: 4, p: 2, border: "1px solid #ccc" }}>
                         <Typography variant="h6" sx={{ mb: 2 }}>
@@ -288,7 +403,7 @@ function ClientFileDefinitions() {
                             <Grid item xs={4}>
                                 <TextField
                                     fullWidth
-                                    label="File Name *"
+                                    label="File Definition Name"
                                     value={newDefinition.name}
                                     onChange={(e) =>
                                         setNewDefinition({ ...newDefinition, name: e.target.value })
@@ -301,11 +416,11 @@ function ClientFileDefinitions() {
                                     <Select
                                         value={newDefinition.lineOfBusiness}
                                         label="Line of Business"
-                                        onChange={handleLineOfBusinessChange}
+                                        onChange={(e) => handleLineOfBusinessChange(e.target.value)}
                                     >
                                         {lineOfBusinessOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>
-                                                {option}
+                                            <MenuItem key={option.value} value={option.value}>
+                                                {option.label}
                                             </MenuItem>
                                         ))}
                                     </Select>
@@ -317,26 +432,24 @@ function ClientFileDefinitions() {
                                     <Select
                                         value={newDefinition.fileType}
                                         label="File Type"
-                                        onChange={handleFileTypeChange}
+                                        onChange={(e) => handleFileTypeChange(e.target.value)}
                                     >
                                         {fileTypeOptions.map((option) => (
-                                            <MenuItem key={option} value={option}>
-                                                {option}
+                                            <MenuItem key={option.value} value={option.value}>
+                                                {option.label}
                                             </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
                             </Grid>
                         </Grid>
-
                         <Button
-                            sx={{ ml: 2 }}
+                            sx={{ mr: 2 }}
                             variant="outlined"
                             onClick={handleAddFileNameToken}
                         >
                             Add File Name Token
                         </Button>
-
                         {newDefinition.fileNameTokens?.map((field, index) => (
                             <Grid container spacing={2} key={`token-${index}`} sx={{ mb: 2 }}>
                                 <Grid item xs={2}>
@@ -355,8 +468,8 @@ function ClientFileDefinitions() {
                                             }}
                                         >
                                             {tokenTypeOptions.map((option) => (
-                                                <MenuItem key={option} value={option}>
-                                                    {option}
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
                                                 </MenuItem>
                                             ))}
                                         </Select>
@@ -388,15 +501,13 @@ function ClientFileDefinitions() {
                                 </Grid>
                             </Grid>
                         ))}
-
                         <Button
                             sx={{ m: 2, ml: 1 }}
                             variant="outlined"
                             onClick={handleAddFieldDefinition}
                         >
-                            + Add Field Definition
+                            Add Field Definition
                         </Button>
-
                         {newDefinition.fieldDefinitions?.map((field, index) => (
                             <Grid container spacing={2} key={`field-${index}`} sx={{ mb: 2 }}>
                                 <Grid item xs={2}>
@@ -438,23 +549,22 @@ function ClientFileDefinitions() {
                                             onChange={(e: SelectChangeEvent) => {
                                                 const updated = [...newDefinition.fieldDefinitions];
                                                 updated[index].fieldType = e.target.value;
-                                                setNewDefinition({
-                                                    ...newDefinition,
+                                                setNewDefinition((prev) => ({
+                                                    ...prev,
                                                     fieldDefinitions: updated,
-                                                });
+                                                }));
                                             }}
                                         >
                                             {fieldTypeOptions.map((option) => (
-                                                <MenuItem key={option} value={option}>
-                                                    {option}
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
                                                 </MenuItem>
                                             ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
-
                                 {/* Show Start/End Position only if NOT YML type */}
-                                {newDefinition.fileType !== 'YML' && (
+                                {newDefinition.fileType !== "YML" && (
                                     <>
                                         <Grid item xs={2}>
                                             <TextField
@@ -494,10 +604,8 @@ function ClientFileDefinitions() {
                                         </Grid>
                                     </>
                                 )}
-
-                                {/* Show Path only if NOT FIXED_WIDTH_TOKENIZED type */}
-                                {newDefinition.fileType !== 'FIXED_WIDTH_TOKENIZED' && (
-                                    <Grid item xs={newDefinition.fileType === 'YML' ? 4 : 2}>
+                                {newDefinition.fileType !== "FIXED_WIDTH_TOKENIZED" && (
+                                    <Grid item xs={newDefinition.fileType === "YML" ? 4 : 2}>
                                         <TextField
                                             fullWidth
                                             label="Path"
@@ -513,7 +621,6 @@ function ClientFileDefinitions() {
                                         />
                                     </Grid>
                                 )}
-
                                 <Grid item xs={2}>
                                     <TextField
                                         fullWidth
@@ -525,79 +632,263 @@ function ClientFileDefinitions() {
                                 </Grid>
                             </Grid>
                         ))}
-
                         <Button variant="contained" onClick={handleSave}>
                             Save
                         </Button>
                     </Box>
                 )}
-
                 <Box>
                     {fileDefinitions.length > 0 ? (
-                        fileDefinitions.map((definition, index) => (
-                            <Paper
-                                key={definition.id || index}
-                                elevation={1}
-                                sx={{
-                                    p: 2,
-                                    backgroundColor: index % 2 === 0 ? "#d6d2d1" : "white",
-                                    borderRadius: 0,
-                                }}
-                            >
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="h6" fontWeight="bold">
-                                            {definition.name || "File Name"}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            LOB: <b>{definition.lineOfBusiness}</b>
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            File Type: <b>{definition.fileType}</b>
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            Field Definitions:{" "}
-                                            <b>{definition.fieldDefinitions?.length || 0}</b>
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            File Name Tokens:{" "}
-                                            <b>{definition.fileNameTokens?.length || 0}</b>
-                                        </Typography>
-
-                                        <Button
-                                            variant="contained"
-                                            size="small"
-                                            sx={{ mt: 2 }}
-                                            onClick={() => handleToggleFieldDefinitions(definition.id || index)}
-                                        >
-                                            {expandedDefinitionId === (definition.id || index)
-                                                ? "Hide Field Definitions"
-                                                : "View Field Definitions"}
-                                        </Button>
-
-                                        {expandedDefinitionId === (definition.id || index) && (
-                                            <Box sx={{ mt: 3, pl: 2 }}>
-                                                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-                                                    Field Definitions for {definition.name}
+                        fileDefinitions.map((definition, index) => {
+                            const rmcForThisDefinition =
+                                rmcGroupedByDefinitionId[definition.id] || [];
+                            return (
+                                <Paper
+                                    key={definition.id || index}
+                                    elevation={1}
+                                    sx={{
+                                        p: 2,
+                                        backgroundColor: index % 2 === 0 ? "#d6d2d1" : "white",
+                                        borderRadius: 0,
+                                    }}
+                                >
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={12}>
+                                            {editingDefinitionId === (definition.id || index) ? (
+                                                <TextField
+                                                    fullWidth
+                                                    label="File Definition Name"
+                                                    value={editingDefinition?.name || ""}
+                                                    onChange={(e) =>
+                                                        setEditingDefinition({
+                                                            ...editingDefinition,
+                                                            name: e.target.value,
+                                                        })
+                                                    }
+                                                />
+                                            ) : (
+                                                <Typography variant="h6" fontWeight="bold">
+                                                    {definition.name || "File Name"}
                                                 </Typography>
-
-                                                {definition.fieldDefinitions && definition.fieldDefinitions.length > 0 ? (
-                                                    <ClientFileFieldDefinitions
-                                                        fieldDefinitions={definition.fieldDefinitions}
-                                                        fileDefinitionName={definition.name}
-                                                        fileType={definition.fileType}
-                                                    />
+                                            )}
+                                            {editingDefinitionId === (definition.id || index) ? (
+                                                <FormControl fullWidth sx={{ mt: 1 }}>
+                                                    <InputLabel>Line of Business</InputLabel>
+                                                    <Select
+                                                        value={editingDefinition?.lineOfBusiness || ""}
+                                                        label="Line of Business"
+                                                        onChange={(e) =>
+                                                            setEditingDefinition({
+                                                                ...editingDefinition,
+                                                                lineOfBusiness: e.target.value,
+                                                            })
+                                                        }
+                                                    >
+                                                        {lineOfBusinessOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            ) : (
+                                                <Typography variant="body2">
+                                                    LOB: <b>{definition.lineOfBusiness}</b>
+                                                </Typography>
+                                            )}
+                                            {editingDefinitionId === (definition.id || index) ? (
+                                                <FormControl fullWidth sx={{ mt: 1 }}>
+                                                    <InputLabel>File Type</InputLabel>
+                                                    <Select
+                                                        value={editingDefinition?.fileType || ""}
+                                                        label="File Type"
+                                                        onChange={(e) =>
+                                                            setEditingDefinition({
+                                                                ...editingDefinition,
+                                                                fileType: e.target.value,
+                                                            })
+                                                        }
+                                                    >
+                                                        {fileTypeOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            ) : (
+                                                <Typography variant="body2">
+                                                    File Type: <b>{definition.fileType}</b>
+                                                </Typography>
+                                            )}
+                                            <Typography variant="body2">
+                                                Field Definitions:{" "}
+                                                <b>{definition.fieldDefinitions?.length || 0}</b>
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                File Name Tokens:{" "}
+                                                <b>{definition.fileNameTokens?.length || 0}</b>
+                                            </Typography>
+                                            <Box sx={{ mt: 2 }}>
+                                                {editingDefinitionId === (definition.id || index) ? (
+                                                    <>
+                                                        <Button
+                                                            variant="contained"
+                                                            size="small"
+                                                            sx={{ mr: 1 }}
+                                                            onClick={handleSaveEdit}
+                                                        >
+                                                            Save
+                                                        </Button>
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            sx={{ mr: 1 }}
+                                                            onClick={handleCancelEdit}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </>
                                                 ) : (
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        No field definitions to display.
-                                                    </Typography>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        sx={{ mr: 1 }}
+                                                        onClick={() => handleEditClick(definition, index)}
+                                                    >
+                                                        Edit
+                                                    </Button>
                                                 )}
+                                                <Button
+                                                    variant="text"
+                                                    size="small"
+                                                    onClick={() =>
+                                                        handleToggleFieldDefinitions(definition.id || index)
+                                                    }
+                                                >
+                                                    {expandedDefinitionId === (definition.id || index)
+                                                        ? "Hide Field Definitions"
+                                                        : "View Field Definitions"}
+                                                </Button>
+                                                <Box sx={{ mt: 3 }}>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        Add Record Match Criteria
+                                                    </Typography>
+                                                    <Grid container spacing={2}>
+                                                        <Grid item xs={4}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Match Criteria Name"
+                                                                value={recordMatch.name}
+                                                                onChange={(e) =>
+                                                                    setRecordMatch({
+                                                                        ...recordMatch,
+                                                                        name: e.target.value,
+                                                                    })
+                                                                }
+                                                            />
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Base Record Field Path"
+                                                                value={recordMatch.baseRecordFieldPath}
+                                                                onChange={(e) =>
+                                                                    setRecordMatch({
+                                                                        ...recordMatch,
+                                                                        baseRecordFieldPath: e.target.value,
+                                                                    })
+                                                                }
+                                                            />
+                                                        </Grid>
+                                                        <Grid item xs={4}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Ruleset ID"
+                                                                value={recordMatch.rulesetId}
+                                                                onChange={(e) =>
+                                                                    setRecordMatch({
+                                                                        ...recordMatch,
+                                                                        rulesetId: e.target.value,
+                                                                    })
+                                                                }
+                                                            />
+                                                        </Grid>
+                                                        <Grid item xs={12}>
+                                                            <Button
+                                                                variant="contained"
+                                                                onClick={() =>
+                                                                    handleSaveRecordMatchCriteria(
+                                                                        definition.id?.toString() || ""
+                                                                    )
+                                                                }
+                                                            >
+                                                                Save Record Match Criteria
+                                                            </Button>
+                                                        </Grid>
+                                                    </Grid>
+                                                </Box>
                                             </Box>
-                                        )}
+                                            {expandedDefinitionId === (definition.id || index) && (
+                                                <Box sx={{ mt: 3, pl: 2 }}>
+                                                    <Typography
+                                                        variant="subtitle1"
+                                                        fontWeight="bold"
+                                                        sx={{ mb: 2 }}
+                                                    >
+                                                        Field Definitions
+                                                    </Typography>
+                                                    {definition.fieldDefinitions &&
+                                                        definition.fieldDefinitions.length > 0 ? (
+                                                        <ClientFileFieldDefinitions
+                                                            fieldDefinitions={definition.fieldDefinitions}
+                                                            fileDefinitionName={definition.name}
+                                                            fileType={definition.fileType}
+                                                        />
+                                                    ) : (
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            No field definitions to display.
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            )}
+                                        </Grid>
                                     </Grid>
-                                </Grid>
-                            </Paper>
-                        ))
+                                    {/* Button to Load RMC */}
+                                    <Button
+                                        size="small"
+                                        onClick={() => handleViewRMC(definition.id)}
+                                        disabled={loadingRmcId === definition.id}
+                                    >
+                                        {loadingRmcId === definition.id ? "Loading..." : "View RMC"}
+                                    </Button>
+                                    <Box mt={2}>
+                                        {rmcForThisDefinition?.length ? (
+                                            rmcForThisDefinition.map((rmc) => (
+                                                <Box key={rmc.id} sx={{ pl: 2, mt: 1 }}>
+                                                    <Typography variant="body2">
+                                                        <b>Name:</b> {rmc.name}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <b>Base Field:</b> {rmc.baseRecordFieldPath}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <b>Ruleset ID:</b> {rmc.rulesetId}
+                                                    </Typography>
+                                                    <Typography variant="body2">
+                                                        <b>Client Field ID:</b> {rmc.clientFileDefinitionId}
+                                                    </Typography>
+                                                </Box>
+                                            ))
+                                        ) : (
+                                            <Typography variant="body2">
+                                                No RMC data available.
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </Paper>
+                            );
+                        })
                     ) : (
                         <Box sx={{ p: 4, textAlign: "center" }}>
                             <Typography variant="body1">
@@ -610,5 +901,4 @@ function ClientFileDefinitions() {
         </Container>
     );
 }
-
 export default ClientFileDefinitions;
