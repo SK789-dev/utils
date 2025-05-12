@@ -26,3 +26,12 @@ export async function getFieldTypes() {
     const response = await axios.get(`/api/clients/field-types`);
     return response.data;
 }
+
+export const getRecordMatchCriteria = async (clientId: string) => {
+    const token = sessionStorage.getItem("accessToken"); // or localStorage.getItem(...) if that’s what you use
+    const response = await DataQualityApi.get(
+        `/api/clients/${clientId}/record-match-criteria`,
+    );
+    if (!response.ok) throw new Error("Failed to fetch RMC");
+    return response.json();
+};

@@ -28,15 +28,20 @@ import {
     getFieldTypes,
     postRecordMatchCriteria,
     getRecordMatchCriteria,
+    getAllRecordMatchCriteria,
 } from "@/api/clients/clientFileDefinitions";
 import { getLinesOfBusiness } from "@/api/lineOfBusiness";
 import { ClientFileDefinitions as ClientFileDefinitionsType } from "@/types/api";
 import ClientFileFieldDefinitions from "@/components/ClientFieldDefinitions";
+import { RecordMatchCriteriaForm } from "./RecordMatchCriteriaForm";
+import { RecordMatchCriteriaView } from "./RecordMatchCriteriaView";
+
 interface FileNameToken {
     type: string;
     token: string;
     tokenOrder: number;
 }
+
 interface FieldDefinition {
     name: string;
     key: string;
@@ -46,10 +51,12 @@ interface FieldDefinition {
     compositeKeyOrder: number;
     path: string;
 }
+
 interface DropdownOption {
     value: string;
     label: string;
 }
+
 interface NewDefinition {
     name: string;
     lineOfBusiness: string;
@@ -57,112 +64,119 @@ interface NewDefinition {
     fileNameTokens: FileNameToken[];
     fieldDefinitions: FieldDefinition[];
 }
+
 function ClientFileDefinitions() {
-    const [editingDefinitionId, setEditingDefinitionId] = useState<
-        string | number | null
-    >(null);
-    const [editingDefinition, setEditingDefinition] =
-        useState<Partial<ClientFileDefinitionsType> | null>(null);
-    const [editingIndex, setEditingIndex] = useState<number | null>(null); // track index if fallback to local update
+    const [editingDefinitionId, setEditingDefinitionId] = useState<string | number | null>(null);
+    const [editingDefinition, setEditingDefinition] = useState<Partial<ClientFileDefinitionsType> | null>(null);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const { clientId } = useParams<{ clientId: string }>();
     const location = useLocation();
     const { clientName, clientCode } = location.state || {};
-    const [fileDefinitions, setFileDefinitions] = useState<
-        ClientFileDefinitionsType[]
-    >([]);
+    const [fileDefinitions, setFileDefinitions] = useState<ClientFileDefinitionsType[]>([]);
     const queryClient = useQueryClient();
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
-    const [expandedDefinitionId, setExpandedDefinitionId] = useState<
-        string | number | null
-    >(null);
-    const [lineOfBusinessOptions, setLineOfBusinessOptions] = useState<
-        DropdownOption[]
-    >([]);
+    const [expandedDefinitionId, setExpandedDefinitionId] = useState<string | number | null>(null);
+    const [lineOfBusinessOptions, setLineOfBusinessOptions] = useState<DropdownOption[]>([]);
     const [fileTypeOptions, setFileTypeOptions] = useState<DropdownOption[]>([]);
-    const [tokenTypeOptions, setTokenTypeOptions] = useState<DropdownOption[]>(
-        []
-    );
-    const [fieldTypeOptions, setFieldTypeOptions] = useState<DropdownOption[]>(
-        []
-    );
+    const [tokenTypeOptions, setTokenTypeOptions] = useState<DropdownOption[]>([]);
+    const [fieldTypeOptions, setFieldTypeOptions] = useState<DropdownOption[]>([]);
+    const [rmcMap, setRmcMap] = useState<Record<string, any[]>>({});
+    const [loadingRmcId, setLoadingRmcId] = useState<string | null>(null);
+
     const { data, isLoading, isError } = useQuery({
         queryKey: ["clientFileDefinitions", clientId],
         queryFn: () =>
             clientId ? getClientFileDefinitions(clientId) : Promise.resolve([]),
         enabled: !!clientId,
     });
+
+    const { data: allRMCs } = useQuery({
+        queryKey: ["recordMatchCriteria", clientId],
+        queryFn: () => clientId ? getAllRecordMatchCriteria(clientId) : Promise.resolve([]),
+        enabled: !!clientId,
+    });
+
+    const rmcGroupedByDefinitionId = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        allRMCs?.forEach((rmc) => {
+            if (!map[rmc.clientFileDefinitionId]) {
+                map[rmc.clientFileDefinitionId] = [];
+            }
+            map[rmc.clientFileDefinitionId].push(rmc);
+        });
+        return map;
+    }, [allRMCs]);
+
     useEffect(() => {
         if (data) {
             setFileDefinitions(Array.isArray(data) ? data : []);
         }
     }, [data]);
+
     useEffect(() => {
-        async function fetchLines() {
-            const lines: string[] = await getLinesOfBusiness();
-            setLineOfBusinessOptions(
-                lines.map((line) => ({
-                    value: line,
-                    label: line,
-                }))
-            );
+        async function fetchDropdownOptions() {
+            try {
+                const [lobs, fileTypes, tokenTypes, fieldTypes] = await Promise.all([
+                    getLinesOfBusiness(),
+                    getFileTypes(),
+                    getTokenTypes(),
+                    getFieldTypes(),
+                ]);
+
+                setLineOfBusinessOptions(lobs.map(line => ({ value: line, label: line })));
+                setFileTypeOptions(fileTypes.map(type => ({ value: type, label: type })));
+                setTokenTypeOptions(tokenTypes.map(type => ({ value: type, label: type })));
+                setFieldTypeOptions(fieldTypes.map(type => ({ value: type, label: type })));
+            } catch (error) {
+                console.error("Failed to fetch dropdown options:", error);
+            }
         }
-        fetchLines();
+
+        fetchDropdownOptions();
     }, []);
-    useEffect(() => {
-        async function fetchLines() {
-            const lines: string[] = await getFileTypes();
-            setFileTypeOptions(
-                lines.map((line) => ({
-                    value: line,
-                    label: line,
-                }))
-            );
-        }
-        fetchLines();
-    }, []);
-    useEffect(() => {
-        async function fetchLines() {
-            const lines: string[] = await getTokenTypes();
-            setTokenTypeOptions(
-                lines.map((line) => ({
-                    value: line,
-                    label: line,
-                }))
-            );
-        }
-        fetchLines();
-    }, []);
-    useEffect(() => {
-        async function fetchLines() {
-            const lines: string[] = await getFieldTypes();
-            setFieldTypeOptions(
-                lines.map((line) => ({
-                    value: line,
-                    label: line,
-                }))
-            );
-        }
-        fetchLines();
-    }, []);
-    useEffect(() => {
-        if (data) {
-            const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name)); // or original index tracking
-            setFileDefinitions(sorted);
-        }
-    }, [data]);
-    const handleEditClick = (
-        definition: ClientFileDefinitionsType,
-        index: number
-    ) => {
-        setEditingDefinitionId(definition.id || index);
-        setEditingDefinition({ ...definition });
-        setEditingIndex(index);
-    };
-    const handleCancelEdit = () => {
-        setEditingDefinitionId(null);
-        setEditingDefinition(null);
-        setEditingIndex(null);
-    };
+
+    const [newDefinition, setNewDefinition] = useState<NewDefinition>({
+        name: "",
+        lineOfBusiness: "",
+        fileType: "",
+        fileNameTokens: [],
+        fieldDefinitions: [],
+    });
+
+    const mutation = useMutation({
+        mutationFn: () => {
+            const payload = {
+                name: newDefinition.name,
+                lineOfBusiness: newDefinition.lineOfBusiness,
+                fileType: newDefinition.fileType,
+                ...(newDefinition.fileNameTokens.length > 0 && {
+                    fileNameTokens: newDefinition.fileNameTokens,
+                }),
+                ...(newDefinition.fieldDefinitions.length > 0 && {
+                    fieldDefinitions: newDefinition.fieldDefinitions,
+                }),
+            };
+            return clientId
+                ? postClientFileDefinitions(clientId, payload as ClientFileDefinitionsType)
+                : Promise.resolve({});
+        },
+        onSuccess: () => {
+            if (clientId) {
+                queryClient.invalidateQueries({
+                    queryKey: ["clientFileDefinitions", clientId],
+                });
+            }
+            setNewDefinition({
+                name: "",
+                lineOfBusiness: "",
+                fileType: "",
+                fileNameTokens: [],
+                fieldDefinitions: [],
+            });
+            setShowAddForm(false);
+        },
+    });
+
     const updateMutation = useMutation({
         mutationFn: () =>
             editingDefinition?.id
@@ -188,76 +202,26 @@ function ClientFileDefinitions() {
             setEditingDefinition(null);
             setEditingIndex(null);
         },
-        onError: (err) => {
-            console.error("Update failed:", err);
-            alert("Failed to update. Please try again.");
-        },
     });
+
+    const handleEditClick = (definition: ClientFileDefinitionsType, index: number) => {
+        setEditingDefinitionId(definition.id || index);
+        setEditingDefinition({ ...definition });
+        setEditingIndex(index);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingDefinitionId(null);
+        setEditingDefinition(null);
+        setEditingIndex(null);
+    };
+
     const handleSaveEdit = () => {
         if (editingDefinition) {
             updateMutation.mutate();
         }
     };
-    const [recordMatch, setRecordMatch] = useState({
-        name: "",
-        baseRecordFieldPath: "",
-        rulesetId: "",
-    });
-    const handleSaveRecordMatchCriteria = async (
-        clientFileDefinitionId: string
-    ) => {
-        try {
-            postRecordMatchCriteria(clientFileDefinitionId, recordMatch);
-            alert("Record Match Criteria created successfully.");
-            setRecordMatch({ name: "", baseRecordFieldPath: "", rulesetId: "" });
-        } catch (err) {
-            alert("Failed to create Record Match Criteria.");
-            console.error(err);
-        }
-    };
-    const [newDefinition, setNewDefinition] = useState<NewDefinition>({
-        name: "",
-        lineOfBusiness: "",
-        fileType: "",
-        fileNameTokens: [],
-        fieldDefinitions: [],
-    });
-    const mutation = useMutation({
-        mutationFn: () => {
-            const payload = {
-                name: newDefinition.name,
-                lineOfBusiness: newDefinition.lineOfBusiness,
-                fileType: newDefinition.fileType,
-                ...(newDefinition.fileNameTokens.length > 0 && {
-                    fileNameTokens: newDefinition.fileNameTokens,
-                }),
-                ...(newDefinition.fieldDefinitions.length > 0 && {
-                    fieldDefinitions: newDefinition.fieldDefinitions,
-                }),
-            };
-            return clientId
-                ? postClientFileDefinitions(
-                    clientId,
-                    payload as ClientFileDefinitionsType
-                )
-                : Promise.resolve({});
-        },
-        onSuccess: () => {
-            if (clientId) {
-                queryClient.invalidateQueries({
-                    queryKey: ["clientFileDefinitions", clientId],
-                });
-            }
-            setNewDefinition({
-                name: "",
-                lineOfBusiness: "",
-                fileType: "",
-                fileNameTokens: [],
-                fieldDefinitions: [],
-            });
-            setShowAddForm(false);
-        },
-    });
+
     const handleAddFileNameToken = () => {
         const nextOrder = newDefinition.fileNameTokens.length;
         setNewDefinition((prev) => ({
@@ -268,6 +232,7 @@ function ClientFileDefinitions() {
             ],
         }));
     };
+
     const handleAddFieldDefinition = () => {
         const nextOrder = newDefinition.fieldDefinitions.length;
         setNewDefinition((prev) => ({
@@ -286,11 +251,13 @@ function ClientFileDefinitions() {
             ],
         }));
     };
+
     const handleToggleFieldDefinitions = (definitionId: string | number) => {
         setExpandedDefinitionId(
             expandedDefinitionId === definitionId ? null : definitionId
         );
     };
+
     const handleSave = () => {
         if (
             newDefinition.name.trim() === "" ||
@@ -311,34 +278,6 @@ function ClientFileDefinitions() {
         }
         mutation.mutate();
     };
-    const handleLineOfBusinessChange = (selectedValue: string) => {
-        setNewDefinition((prev) => ({
-            ...prev,
-            lineOfBusiness: selectedValue,
-        }));
-    };
-    const handleFileTypeChange = (selectedValue: string) => {
-        setNewDefinition((prev) => ({
-            ...prev,
-            fileType: selectedValue,
-        }));
-    };
-    const { data: allRMCs } = useQuery({
-        queryKey: ["recordMatchCriteria", clientId],
-        queryFn: () => getAllRecordMatchCriteria(clientId),
-    });
-    const rmcGroupedByDefinitionId = useMemo(() => {
-        const map: Record<string, any[]> = {};
-        allRMCs?.forEach((rmc) => {
-            if (!map[rmc.clientFileDefinitionId]) {
-                map[rmc.clientFileDefinitionId] = [];
-            }
-            map[rmc.clientFileDefinitionId].push(rmc);
-        });
-        return map;
-    }, [allRMCs]);
-    const [rmcMap, setRmcMap] = useState<Record<string, any[]>>({});
-    const [loadingRmcId, setLoadingRmcId] = useState<string | null>(null);
 
     const handleViewRMC = async (definitionId: string) => {
         setLoadingRmcId(definitionId);
@@ -354,6 +293,7 @@ function ClientFileDefinitions() {
             setLoadingRmcId(null);
         }
     };
+
     return (
         <Container maxWidth="xl" sx={{ mt: 4 }}>
             <Box sx={{ mb: 3 }}>
@@ -382,18 +322,19 @@ function ClientFileDefinitions() {
                         {showAddForm ? "Close" : "+ Add File Definition"}
                     </Button>
                 </Box>
+
                 {isLoading && (
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
                         <CircularProgress />
                     </Box>
                 )}
+
                 {isError && (
                     <Alert severity="error" sx={{ mt: 2 }}>
                         Failed to load file definitions. Please try again.
                     </Alert>
                 )}
 
-                S P  to  Everyone 10:24 PM
                 {showAddForm && (
                     <Box sx={{ mt: 3, mb: 4, p: 2, border: "1px solid #ccc" }}>
                         <Typography variant="h6" sx={{ mb: 2 }}>
@@ -416,7 +357,7 @@ function ClientFileDefinitions() {
                                     <Select
                                         value={newDefinition.lineOfBusiness}
                                         label="Line of Business"
-                                        onChange={(e) => handleLineOfBusinessChange(e.target.value)}
+                                        onChange={(e) => setNewDefinition({ ...newDefinition, lineOfBusiness: e.target.value })}
                                     >
                                         {lineOfBusinessOptions.map((option) => (
                                             <MenuItem key={option.value} value={option.value}>
@@ -432,7 +373,7 @@ function ClientFileDefinitions() {
                                     <Select
                                         value={newDefinition.fileType}
                                         label="File Type"
-                                        onChange={(e) => handleFileTypeChange(e.target.value)}
+                                        onChange={(e) => setNewDefinition({ ...newDefinition, fileType: e.target.value })}
                                     >
                                         {fileTypeOptions.map((option) => (
                                             <MenuItem key={option.value} value={option.value}>
@@ -443,6 +384,7 @@ function ClientFileDefinitions() {
                                 </FormControl>
                             </Grid>
                         </Grid>
+
                         <Button
                             sx={{ mr: 2 }}
                             variant="outlined"
@@ -450,6 +392,7 @@ function ClientFileDefinitions() {
                         >
                             Add File Name Token
                         </Button>
+
                         {newDefinition.fileNameTokens?.map((field, index) => (
                             <Grid container spacing={2} key={`token-${index}`} sx={{ mb: 2 }}>
                                 <Grid item xs={2}>
@@ -496,11 +439,12 @@ function ClientFileDefinitions() {
                                         label="File Name Token Order"
                                         type="number"
                                         value={field.tokenOrder + 1}
-                                        disabled={true} // Disabled as it's auto-generated
+                                        disabled
                                     />
                                 </Grid>
                             </Grid>
                         ))}
+
                         <Button
                             sx={{ m: 2, ml: 1 }}
                             variant="outlined"
@@ -508,6 +452,7 @@ function ClientFileDefinitions() {
                         >
                             Add Field Definition
                         </Button>
+
                         {newDefinition.fieldDefinitions?.map((field, index) => (
                             <Grid container spacing={2} key={`field-${index}`} sx={{ mb: 2 }}>
                                 <Grid item xs={2}>
@@ -563,7 +508,7 @@ function ClientFileDefinitions() {
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                {/* Show Start/End Position only if NOT YML type */}
+
                                 {newDefinition.fileType !== "YML" && (
                                     <>
                                         <Grid item xs={2}>
@@ -604,6 +549,7 @@ function ClientFileDefinitions() {
                                         </Grid>
                                     </>
                                 )}
+
                                 {newDefinition.fileType !== "FIXED_WIDTH_TOKENIZED" && (
                                     <Grid item xs={newDefinition.fileType === "YML" ? 4 : 2}>
                                         <TextField
@@ -621,27 +567,30 @@ function ClientFileDefinitions() {
                                         />
                                     </Grid>
                                 )}
+
                                 <Grid item xs={2}>
                                     <TextField
                                         fullWidth
                                         label="Composite Key Order"
                                         type="number"
                                         value={field.compositeKeyOrder + 1}
-                                        disabled={true} // Disabled as it's auto-generated
+                                        disabled
                                     />
                                 </Grid>
                             </Grid>
                         ))}
+
                         <Button variant="contained" onClick={handleSave}>
                             Save
                         </Button>
                     </Box>
                 )}
+
                 <Box>
                     {fileDefinitions.length > 0 ? (
                         fileDefinitions.map((definition, index) => {
-                            const rmcForThisDefinition =
-                                rmcGroupedByDefinitionId[definition.id] || [];
+                            const rmcForThisDefinition = rmcGroupedByDefinitionId[definition.id] || [];
+
                             return (
                                 <Paper
                                     key={definition.id || index}
@@ -650,6 +599,7 @@ function ClientFileDefinitions() {
                                         p: 2,
                                         backgroundColor: index % 2 === 0 ? "#d6d2d1" : "white",
                                         borderRadius: 0,
+                                        mb: 2,
                                     }}
                                 >
                                     <Grid container spacing={2}>
@@ -671,6 +621,7 @@ function ClientFileDefinitions() {
                                                     {definition.name || "File Name"}
                                                 </Typography>
                                             )}
+
                                             {editingDefinitionId === (definition.id || index) ? (
                                                 <FormControl fullWidth sx={{ mt: 1 }}>
                                                     <InputLabel>Line of Business</InputLabel>
@@ -696,6 +647,7 @@ function ClientFileDefinitions() {
                                                     LOB: <b>{definition.lineOfBusiness}</b>
                                                 </Typography>
                                             )}
+
                                             {editingDefinitionId === (definition.id || index) ? (
                                                 <FormControl fullWidth sx={{ mt: 1 }}>
                                                     <InputLabel>File Type</InputLabel>
@@ -721,14 +673,17 @@ function ClientFileDefinitions() {
                                                     File Type: <b>{definition.fileType}</b>
                                                 </Typography>
                                             )}
+
                                             <Typography variant="body2">
                                                 Field Definitions:{" "}
                                                 <b>{definition.fieldDefinitions?.length || 0}</b>
                                             </Typography>
+
                                             <Typography variant="body2">
                                                 File Name Tokens:{" "}
                                                 <b>{definition.fileNameTokens?.length || 0}</b>
                                             </Typography>
+
                                             <Box sx={{ mt: 2 }}>
                                                 {editingDefinitionId === (definition.id || index) ? (
                                                     <>
@@ -759,6 +714,7 @@ function ClientFileDefinitions() {
                                                         Edit
                                                     </Button>
                                                 )}
+
                                                 <Button
                                                     variant="text"
                                                     size="small"
@@ -770,65 +726,30 @@ function ClientFileDefinitions() {
                                                         ? "Hide Field Definitions"
                                                         : "View Field Definitions"}
                                                 </Button>
-                                                <Box sx={{ mt: 3 }}>
-                                                    <Typography variant="subtitle1" fontWeight="bold">
-                                                        Add Record Match Criteria
-                                                    </Typography>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={4}>
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Match Criteria Name"
-                                                                value={recordMatch.name}
-                                                                onChange={(e) =>
-                                                                    setRecordMatch({
-                                                                        ...recordMatch,
-                                                                        name: e.target.value,
-                                                                    })
-                                                                }
-                                                            />
-                                                        </Grid>
-                                                        <Grid item xs={4}>
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Base Record Field Path"
-                                                                value={recordMatch.baseRecordFieldPath}
-                                                                onChange={(e) =>
-                                                                    setRecordMatch({
-                                                                        ...recordMatch,
-                                                                        baseRecordFieldPath: e.target.value,
-                                                                    })
-                                                                }
-                                                            />
-                                                        </Grid>
-                                                        <Grid item xs={4}>
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Ruleset ID"
-                                                                value={recordMatch.rulesetId}
-                                                                onChange={(e) =>
-                                                                    setRecordMatch({
-                                                                        ...recordMatch,
-                                                                        rulesetId: e.target.value,
-                                                                    })
-                                                                }
-                                                            />
-                                                        </Grid>
-                                                        <Grid item xs={12}>
-                                                            <Button
-                                                                variant="contained"
-                                                                onClick={() =>
-                                                                    handleSaveRecordMatchCriteria(
-                                                                        definition.id?.toString() || ""
-                                                                    )
-                                                                }
-                                                            >
-                                                                Save Record Match Criteria
-                                                            </Button>
-                                                        </Grid>
-                                                    </Grid>
-                                                </Box>
                                             </Box>
+
+                                            {definition.id && (
+                                                <RecordMatchCriteriaForm
+                                                    fieldDefinitions={definition.fieldDefinitions || []}
+                                                    onSubmit={async (data) => {
+                                                        try {
+                                                            await postRecordMatchCriteria(definition.id?.toString() || "", data);
+                                                            alert("Record Match Criteria created successfully.");
+                                                            if (definition.id) {
+                                                                const updatedData = await getRecordMatchCriteria(clientId);
+                                                                setRmcMap((prev) => ({
+                                                                    ...prev,
+                                                                    [definition.id]: updatedData,
+                                                                }));
+                                                            }
+                                                        } catch (err) {
+                                                            alert("Failed to create Record Match Criteria.");
+                                                            console.error(err);
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+
                                             {expandedDefinitionId === (definition.id || index) && (
                                                 <Box sx={{ mt: 3, pl: 2 }}>
                                                     <Typography
@@ -852,40 +773,14 @@ function ClientFileDefinitions() {
                                                     )}
                                                 </Box>
                                             )}
+
+                                            <RecordMatchCriteriaView
+                                                rmcList={rmcMap[definition.id] || rmcForThisDefinition}
+                                                loading={loadingRmcId === definition.id}
+                                                onViewRMC={() => handleViewRMC(definition.id)}
+                                            />
                                         </Grid>
                                     </Grid>
-                                    {/* Button to Load RMC */}
-                                    <Button
-                                        size="small"
-                                        onClick={() => handleViewRMC(definition.id)}
-                                        disabled={loadingRmcId === definition.id}
-                                    >
-                                        {loadingRmcId === definition.id ? "Loading..." : "View RMC"}
-                                    </Button>
-                                    <Box mt={2}>
-                                        {rmcForThisDefinition?.length ? (
-                                            rmcForThisDefinition.map((rmc) => (
-                                                <Box key={rmc.id} sx={{ pl: 2, mt: 1 }}>
-                                                    <Typography variant="body2">
-                                                        <b>Name:</b> {rmc.name}
-                                                    </Typography>
-                                                    <Typography variant="body2">
-                                                        <b>Base Field:</b> {rmc.baseRecordFieldPath}
-                                                    </Typography>
-                                                    <Typography variant="body2">
-                                                        <b>Ruleset ID:</b> {rmc.rulesetId}
-                                                    </Typography>
-                                                    <Typography variant="body2">
-                                                        <b>Client Field ID:</b> {rmc.clientFileDefinitionId}
-                                                    </Typography>
-                                                </Box>
-                                            ))
-                                        ) : (
-                                            <Typography variant="body2">
-                                                No RMC data available.
-                                            </Typography>
-                                        )}
-                                    </Box>
                                 </Paper>
                             );
                         })
@@ -901,4 +796,5 @@ function ClientFileDefinitions() {
         </Container>
     );
 }
+
 export default ClientFileDefinitions;
