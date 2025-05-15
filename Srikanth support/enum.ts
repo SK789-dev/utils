@@ -7,7 +7,7 @@ export async function getTokenTypes() {
     const response = await DataQualityApi.get<string[]>(`/token-types`);
     return response.data;
 }
-export async function getFieldTypes() {
+export async function fetchFieldTypes() {
     const response = await DataQualityApi.get<string[]>(`/field-types`);
     return response.data;
 }
