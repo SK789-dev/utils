@@ -1,57 +1,67 @@
-import { ClientFileDefinitions } from "@/types/api";
+import { ClientFileDefinition, ClientFileFieldDefinition } from "@/types/api";
+import DataQualityApi from ".";
 
-export const getClientFileDefinitions = async (clientId: string) => {
-    const response = await DataQualityApi.get(`/api/clients/${clientId}/file-definitions`);
-    return response.data; // This should return an array
+export const fetchFileDefinitions = async () => {
+  const response = await DataQualityApi.get<ClientFileDefinition[]>(
+    `/file-definitions`
+  );
+  return response?.data;
 };
 
-export async function postClientFileDefinitions(clientId: string, payload: ClientFileDefinitions) {
-    const response = await DataQualityApi.post(`/api/clients/${clientId}/file-definitions`, payload);
-    return response.data;
-}
-
-// New API functions for dropdown data
-export async function getFileTypes() {
-    const response = await DataQualityApi.get(`/api/clients/file-types`);
-    return response.data;
-}
-
-export async function getTokenTypes() {
-    const response = await DataQualityApi.get(`/api/clients/token-types`);
-    return response.data;
-}
-
-export async function getFieldTypes() {
-    const response = await DataQualityApi.get(`/api/clients/field-types`);
-    return response.data;
-}
-
-export const getRecordMatchCriteria = async (clientId: string) => {
-    const token = sessionStorage.getItem("accessToken"); // or localStorage.getItem(...) if that’s what you use
-    const response = await DataQualityApi.get(
-        `/api/clients/${clientId}/record-match-criteria`,
-    );
-    if (!response.ok) throw new Error("Failed to fetch RMC");
-    return response.json();
+export const fetchFileDefinitionsByClientId = async (clientId: string) => {
+  const response = await DataQualityApi.get<ClientFileDefinition[]>(
+    `/clients/${clientId}/file-definitions`
+  );
+  return response?.data;
 };
 
-export const createFieldDefinition = async (definitionId: string, fieldDefinition: any) => {
+export async function createClientFileDefinitions(
+  clientId: string,
+  payload: ClientFileDefinition
+) {
+  const response = await DataQualityApi.post(
+    `/clients/${clientId}/file-definitions`,
+    payload
+  );
+  return response.data;
+}
+export const updateClientFileDefinition = (
+  defId: string,
+  payload: Partial<ClientFileDefinition>
+) => {
+  return DataQualityApi.put(`/file-definitions/${defId}`, payload);
+};
+
+
+export const createFieldDefinition = async (fileDefinitionId: string, fieldDefinition: ClientFileFieldDefinition) => {
+const response = await DataQualityApi.post(
+// `/client-file-definitions/${definitionId}/field-definitions`,
+`/file-definitions/${fileDefinitionId}/field-definitions`,
+fieldDefinition
+);
+return response.data;
+};
+export const updateFieldDefinition = async (id: string, updates: ClientFileFieldDefinition) => {
+const response = await DataQualityApi.put(
+`/field-definitions/${id}`,
+updates
+);
+return response.data;
+};
+export const deleteFieldDefinition = async (id: string) => {
+const response = await DataQualityApi.delete(`/field-definitions/${id}`);
+return response.data;
+};
+export const associateFileDefinition = async (
+   // clientId: string,
+    data: {
+        clientFileDefinition1Id: string;
+        clientFileDefinition2Id: string;
+    }
+) => {
     const response = await DataQualityApi.post(
-        `/api/client-file-definitions/${definitionId}/field-definitions`,
-        fieldDefinition
+        `/associated-file-definitions`,
+        data
     );
-    return response.data;
-};
-
-export const updateFieldDefinition = async (fieldDefinitionId: string, updates: any) => {
-    const response = await DataQualityApi.put(
-        `/api/field-definitions/${fieldDefinitionId}`,
-        updates
-    );
-    return response.data;
-};
-
-export const deleteFieldDefinition = async (fieldDefinitionId: string) => {
-    const response = await DataQualityApi.delete(`/api/field-definitions/${fieldDefinitionId}`);
     return response.data;
 };
