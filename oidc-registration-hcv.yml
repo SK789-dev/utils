@@ -1,0 +1,104 @@
+name: OIDC Registration - HC Vault
+
+on:
+  workflow_dispatch:
+    inputs:
+      vault_namespace:
+        description: "HashiCorp Vault Namespace"
+        type: string
+        default: cloud
+        required: true
+      vault_secret_store:
+        description: "HashiCorp Vault Secret Store"
+        type: string
+        default: 'kv-strategic-solutions'
+        required: true
+      service_name:
+        description: "Name of the service. Generally Service name should be same as application name. However the account name will add <environment><service_name>.primetherapeutics.com"
+        type: choice
+        required: true
+        options:
+          - ss-data-quality-manager
+      target_environment:
+        description: 'dev, test, qa, stage, prod'
+        type: choice
+        options:
+          - dev
+          - test
+          - qa
+          - stage
+          - prod
+      target_environment_type:
+        description: 'Target environment Type which can be classified as nonprod and prod'
+        type: choice
+        required: false
+        options:
+          - nonprod
+          - prod
+      vault_secret_data_path:
+        description: "HashiCorp Vault Data Path"
+        type: choice
+        required: true
+        default: nonprod/dev/ss-data-quality-manager-dev/oidc
+        options:
+          - nonprod/dev/ss-data-quality-manager-dev/oidc/dev
+          - nonprod/qa/ss-data-quality-manager-qa/oidc/qa
+          - prod/stage/ss-data-quality-manager-stage/oidc/stage
+          - prod/prod/ss-data-quality-manager-prod/oidc/prod
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pushing-hashicorp-services:
+    runs-on: docker
+    steps:
+      - name: Checkout repo to get workflow properties
+        uses: actions/checkout@v3
+
+      - name: Print workflow info to job summary & log
+        continue-on-error: true
+        run: |
+          echo -e '## Actor: \nWorkflow triggered by ${{ github.triggering_actor }} (github.triggering_actor) with privileges of ${{ github.actor }} (github.actor).' >> $GITHUB_STEP_SUMMARY
+          echo "*It's normal for some of the below values to be empty.*"
+          echo -e '## Ref/Branch Info: \ngithub.ref: ${{ github.ref }} \ngithub.head_ref: ${{ github.head_ref }} \ngithub.base_ref: ${{ github.base_ref }} \ngithub.ref_protected: ${{ github.ref_protected }}' >> $GITHUB_STEP_SUMMARY
+          echo -e '## Workflow Inputs: \n${{ toJSON(inputs) }}' >> $GITHUB_STEP_SUMMARY
+          cat << EndOfMessage
+          Print full github object to log:
+          ${{ toJSON(github) }}
+          EndOfMessage
+
+      - name: Prep appropriate secret
+        id: secrets
+        uses: hashicorp/vault-action@v2
+        with:
+          method: ${{ vars.VAULT_AUTH_METHOD }} # jwt
+          url: ${{ vars.VAULT_ADDR }} # https://hcvault.primetherapeutics.com:8200
+          namespace: ${{ vars.VAULT_NAMESPACE_CICD }}
+          role: cicd-read
+          exportToken: true
+          secrets: |
+            ${{ vars.VAULT_PATH_KEY_SVC_JENKINS_CA_CLIENT_REG_NONP_USR }} | SVC_JENKINS_CA_CLIENT_REG_NONP_USR;
+            ${{ vars.VAULT_PATH_KEY_SVC_JENKINS_CA_CLIENT_REG_NONP_PSW }} | SVC_JENKINS_CA_CLIENT_REG_NONP_PSW;
+            ${{ vars.VAULT_PATH_KEY_CF_NONP_USR }} | HCV_USERNAME;
+            ${{ vars.VAULT_PATH_KEY_CF_NONP_PSW }} | HCV_PASSWORD;
+
+      - name: OIDC Registration
+        uses: Lord-of-the-Repos/skynet-client-registration/.github/actions/registerHCV@main
+
+        with:
+          service_name: ${{ inputs.service_name }} # Application name should be service name. please make sure the json file should match with <application_name>-registration-<environment>.json
+          environment: ${{ inputs.target_environment }}
+          environment_type: ${{ inputs.target_environment_type }}
+          vault_namespace: ${{ inputs.vault_namespace }}
+          vault_auth_method: ${{ vars.VAULT_AUTH_METHOD }}
+          vault_address: ${{ vars.VAULT_ADDR }}
+          vault_token: ${{ env.VAULT_TOKEN }}
+          vault_role_name: "strategic-solutions"
+          vault_secret_store: ${{ inputs.vault_secret_store }}
+          vault_secret_data_path: ${{ inputs.vault_secret_data_path }}
+          vault_accessor_usr: ${{ steps.secrets.outputs.HCV_USERNAME }}
+          vault_accessor_psw: ${{ steps.secrets.outputs.HCV_PASSWORD }}
+          reg_accessor_usr: ${{ steps.secrets.outputs.SVC_JENKINS_CA_CLIENT_REG_NONP_USR }}
+          reg_accessor_psw: ${{ steps.secrets.outputs.SVC_JENKINS_CA_CLIENT_REG_NONP_PSW }}

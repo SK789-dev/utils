@@ -1,0 +1,29 @@
+name: Promote - GKE
+
+on:
+  # Allows you to run this workflow manually from the Actions tab if you have merged this to your default branch.
+  workflow_dispatch:
+    inputs:
+      # All of the optional arguments have been commented out here, as it's suggested for you to hardcode these values or rely on your workflow properties
+      helm_version_to_promote:
+        description: "helm_version_to_promote: Version of Helm Chart in Nexus Repository Manager to promote."
+        type: string
+        required: true
+
+jobs:
+  invoke-ru-promote:
+    name: Promote
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-promote-gke.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    # These are parameters that the reusable workflow needs to run.
+    with:
+      workflow_properties_file_path: ./.github/workflow_properties.yml
+      helm_version_to_promote: ${{ inputs.helm_version_to_promote }}
+      artifact_name: ss-data-quality-manager # You can hardcode values here (similar to how 'jar' is hardcoded below) if the workflows can't find your values automatically
+      artifact_group: com.primetherapeutics.strategicsolutions
+      artifact_extension: ${{ inputs.artifact_extension || 'jar' || 'tgz'}} # OR 'tgz'
+      nexus_dev_repo: ${{ inputs.nexus_dev_repo     || 'application-development' }} # OR 'npm-development'
+      nexus_release_repo: ${{ inputs.nexus_release_repo || 'application-release' }} # OR 'npm-release'
+      #dry_run: 'false'
+    # Secrets that are accessible in your repo/organization need to be passed to the reusable workflows.
+    secrets: inherit
+

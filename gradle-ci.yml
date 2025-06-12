@@ -1,0 +1,29 @@
+#
+# This workflow calls a reusable workflow which will build your code, lint, scan, etc.
+# It may or may not publish an artifact depending on your properties and which branch it is executing against.
+#
+
+name: Gradle CI
+
+# "on:" controls what triggers the workflow to run
+on:
+  # Triggers the workflow on opening, updating, or re-opening a PR
+  pull_request:
+
+    branches: [ develop, qa ]
+
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# The heart of every workflow is defined in the 'jobs' section
+jobs:
+  invoke-ru-gradle-ci:
+    name: Gradle CI
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-gradle-ci.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    # These are parameters that the reusable workflow needs to run.
+    with:
+      workflow_properties_file_path: ./.github/workflow_properties.yml
+      is_cicd: false
+    # Secrets that are accessible in your repo/organization need to be passed to the reusable workflows.
+    secrets: inherit

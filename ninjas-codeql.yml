@@ -1,0 +1,15 @@
+name: CodeQL
+
+# "on:" controls what triggers the workflow to run
+on:
+  workflow_dispatch: # Enables users to run this manually
+  schedule:              
+    - cron: '23 8 * * 1'
+
+jobs:
+  invoke-ru-default-codeql:
+    name: CodeQL
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-default-codeql.yml@v2
+    with:
+      workflow_properties_file_path: ./.github/workflow_properties.yml
+    secrets: inherit

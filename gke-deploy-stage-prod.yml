@@ -1,0 +1,42 @@
+name: Manual GKE Deploy - Stage, Prod
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Which Space will the app deploy to?"
+        type: choice
+        required: true
+        options:
+          - 'stage'
+          - 'prod'
+      helm_chart_version:
+        description: "helm_chart_version: Version of Helm Chart artifact to deploy as hosted in Nexus Repository Manager."
+        type: string
+        required: true
+      chg_number:
+        description: "chg_number: The change number from ServiceNow (required for stage and prod deployments; can be provided as comment to the deploy approval)."
+        type: string
+        required: false
+      dry_run:
+        description: "dry_run: Whether to make this a dry run, which executes all steps except the actual deploy"
+        default: 'false'
+        type: choice
+        required: false
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  invoke-ru-gke-cd:
+    name: GKE CD
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-gke-cd.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    with:
+      deployment_properties_file_path: '.github/prime_envs/gke-${{ inputs.target_environment }}.yml'
+      chg_number: ${{ inputs.chg_number }}
+      nexus_helm_repository: helm-release
+      helm_chart_version: ${{ inputs.helm_chart_version }}
+      environment: ${{ inputs.target_environment }} # This must match an environment you've set up in your GitHub repository settings
+      runs_on: ${{ inputs.runs_on }} # Optional input; ignore unless you know what you're doing
+    secrets: inherit

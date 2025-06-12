@@ -1,0 +1,55 @@
+#
+# This workflow calls a series of reusable workflows to build, test, containerize, and deploy your application.
+# It is meant to be customizable; add deployments to additional environments, artifact promotion, integration testing, etc. as you see fit.
+#
+
+name: Gradle CICD CNBP
+
+on:
+  # Workflow dispatch allows you to execute the workflow manually (we don't recommend doing this regularly; it is an option mostly for troubleshooting)
+  workflow_dispatch:
+
+  # Triggers the workflow on push to develop, qa, stage or main. This *includes* merged pull requests.
+  push:
+
+    branches: [ develop, qa ]
+
+
+jobs:
+  # This runs our CI or "continuous integration" reusable workflow to build and test your application
+  invoke-ru-gradle-ci:
+    name: Gradle CI
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-gradle-ci.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    with:
+      workflow_properties_file_path: ./.github/workflow_properties.yml
+      is_cicd: true # this indicates that the workflow is called from a CICD context, so it should publish an artifact to Nexus which the deployment can use
+      runs_on: ${{ inputs.runs_on }} # Optional input; ignore unless you know what you're doing
+    secrets: inherit
+
+  invoke-ru-containerize:
+    name: Containerize
+    needs: invoke-ru-gradle-ci
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-containerize.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    with:
+      workflow_properties_file_path: ./.github/workflow_properties.yml
+      artifact_version: ${{ needs.invoke-ru-gradle-ci.outputs.version }}
+      sync_to_cloud: 'gar'
+      image_tags: '' # add optional additional image tags here. By default all images will be tagged with a semantic version and run image name/tag. e.g. 1.2.3-run-jammy-base-0.1.117
+      runs_on: ${{ inputs.runs_on }} # Optional input; ignore unless you know what you're doing
+    secrets: inherit
+
+  invoke-ru-gke-cd-dev:
+    name: GKE CD Dev
+    needs: invoke-ru-containerize
+    uses: Lord-of-the-Repos/ninjas-reusable-workflows/.github/workflows/ru-gke-cd.yml@v2 # <--- note the branch/version following the @. This will need to be updated occasionally.
+    with:
+      namespace_name: 'judi-integr-dev' # e.g. 'judijunction-dev'
+      helm_chart_ref: 'prime-helm/ss-data-quality-manager' # e.g. 'prime-helm/aop-hello-gcp-helm'
+      release_name: 'ss-data-quality-manager-release' # e.g. 'aop-hello-gcp-helm-release'
+      deployment_properties_file_path: '.github/prime_envs/gke-dev.yml'
+      helm_chart_version: ${{ needs.invoke-ru-containerize.outputs.pushed_image_tag }}
+      environment: 'nonprod' # This must match an environment you've set up in your GitHub repository settings
+      runs_on: ${{ inputs.runs_on }} # Optional input; ignore unless you know what you're doing
+    secrets: inherit
+
+
